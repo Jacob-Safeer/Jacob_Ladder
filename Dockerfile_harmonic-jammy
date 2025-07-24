@@ -1,0 +1,41 @@
+# DO NOT DELETE OR MODIFY
+# Dockerfile for working px4, ubuntu jammy, and gazebo harmonic simulation
+
+FROM px4io/px4-dev-base-jammy:2024-05-18
+LABEL maintainer="Jacob Safeer <jesafeer@gmail.com>"
+
+# Add Gazebo Harmonic apt repository and key
+RUN wget https://packages.osrfoundation.org/gazebo.gpg -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" > /etc/apt/sources.list.d/gazebo-stable.list \
+    && apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get -y --quiet --no-install-recommends install \
+        ant \
+        binutils \
+        bc \
+        dirmngr \
+        gz-harmonic \
+        gstreamer1.0-plugins-bad \
+        gstreamer1.0-plugins-base \
+        gstreamer1.0-plugins-good \
+        gstreamer1.0-plugins-ugly \
+        libeigen3-dev \
+        libgstreamer-plugins-base1.0-dev \
+        libimage-exiftool-perl \
+        libopencv-dev \
+        libxml2-utils \
+        mesa-utils \
+        protobuf-compiler \
+        x-window-system \
+    && apt-get -y autoremove \
+    && apt-get clean autoclean \
+    && rm -rf /var/lib/apt/lists/{apt,dpkg,cache,log} /tmp/* /var/tmp/*
+
+# QT/Gazebo display fixes
+ENV QT_X11_NO_MITSHM 1
+ENV JAVA_TOOL_OPTIONS=-Dfile.encoding=UTF8
+
+# Install JSBSim (Optional: Consider building from source for newer Ubuntu releases)
+RUN wget https://github.com/JSBSim-Team/jsbsim/releases/download/v1.1.1a/JSBSim-devel_1.1.1-134.focal.amd64.deb \
+    && dpkg -i JSBSim-devel_1.1.1-134.focal.amd64.deb \
+    && rm JSBSim-devel_1.1.1-134.focal.amd64.deb
+
