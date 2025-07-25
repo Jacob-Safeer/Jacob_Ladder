@@ -1,0 +1,9 @@
+FROM jacobsafeer/px4-dev-harmonic-jammy-humble-opencv:latest
+
+ENV XDG_RUNTIME_DIR=/tmp/runtime
+
+# Create dir and set ownership to user 1000:1000
+RUN mkdir -p ${XDG_RUNTIME_DIR} && chown 1000:1000 ${XDG_RUNTIME_DIR} && chmod 700 ${XDG_RUNTIME_DIR}
+
+CMD ["/bin/bash"]
+
