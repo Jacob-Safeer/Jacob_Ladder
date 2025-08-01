@@ -14,6 +14,7 @@ PrecisionLand::PrecisionLand(rclcpp::Node& node)
 	: ModeBase(node, kModeName)
 	, _node(node)
 {
+	setSkipMessageCompatibilityCheck(); // added this line for message translation to run properly
 
 	_trajectory_setpoint = std::make_shared<px4_ros2::TrajectorySetpointType>(*this);
 
