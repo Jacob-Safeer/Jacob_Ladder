@@ -1,0 +1,46 @@
+FROM jacobsafeer/px4-dev-harmonic-jammy-humble-opencv:latest
+
+LABEL maintainer="Jacob Safeer"
+LABEL description="PX4/ROS2/OpenCV with functional rqt and Micro XRCE-DDS Agent (sandboxed install)"
+
+# Enable GUI runtime environment
+ENV XDG_RUNTIME_DIR=/tmp/runtime
+RUN mkdir -p ${XDG_RUNTIME_DIR} && \
+    chown 1000:1000 ${XDG_RUNTIME_DIR} && \
+    chmod 700 ${XDG_RUNTIME_DIR}
+
+# Install dependencies for XRCE Agent and GUI support
+RUN apt-get update && apt-get install -y \
+    cmake \
+    build-essential \
+    git \
+    libasio-dev \
+    libtinyxml2-dev \
+    libgl1 \
+    libxcb-xinerama0 \
+    ros-humble-rqt-image-view && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /opt
+
+# Clone and build Micro XRCE-DDS Agent to custom prefix
+RUN git clone --branch v2.4.3 --depth 1 https://github.com/eProsima/Micro-XRCE-DDS-Agent.git && \
+    mkdir -p Micro-XRCE-DDS-Agent/build && \
+    cd Micro-XRCE-DDS-Agent/build && \
+    cmake .. -DCMAKE_INSTALL_PREFIX=/opt/xrce-agent && \
+    make -j$(nproc) && \
+    make install && \
+    rm -rf /opt/Micro-XRCE-DDS-Agent
+
+# Export custom agent bin/lib path
+ENV PATH="/opt/xrce-agent/bin:$PATH"
+ENV LD_LIBRARY_PATH="/opt/xrce-agent/lib:$LD_LIBRARY_PATH"
+
+# Qt plugin path for GUI
+ENV QT_QPA_PLATFORM_PLUGIN_PATH=/usr/lib/x86_64-linux-gnu/qt5/plugins/platforms
+
+# Set working directory to home
+WORKDIR /
+
+CMD ["/bin/bash"]
