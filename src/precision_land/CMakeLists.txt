@@ -17,21 +17,33 @@ find_package(tf2 REQUIRED)
 
 include_directories(${Eigen3_INCLUDE_DIRS})
 
+# Original static platform version
 add_executable(precision_land
     PrecisionLand.cpp
 )
-
 ament_target_dependencies(precision_land rclcpp Eigen3 px4_ros2_cpp geometry_msgs tf2_ros tf2)
-
 target_compile_features(precision_land PUBLIC c_std_99 cxx_std_17)
 
-install(TARGETS precision_land DESTINATION lib/${PROJECT_NAME})
+# New track & follow version
+add_executable(track_follow
+    TrackFollow.cpp
+)
+ament_target_dependencies(track_follow rclcpp Eigen3 px4_ros2_cpp geometry_msgs tf2_ros tf2)
+target_compile_features(track_follow PUBLIC c_std_99 cxx_std_17)
+
+# Install both executables
+install(TARGETS
+  precision_land
+  track_follow
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 if(BUILD_TESTING)
     find_package(ament_lint_auto REQUIRED)
     ament_lint_auto_find_test_dependencies()
 endif()
 
+# Install launch and config folders
 install(DIRECTORY launch
   DESTINATION share/${PROJECT_NAME}/
 )
@@ -41,3 +53,5 @@ install(DIRECTORY cfg
 )
 
 ament_package()
+
+
