@@ -109,7 +109,7 @@ private:
 	float _param_approach_lead_max = 1.5f;  // clamp on lookahead distance (m)
 	float _param_approach_ff_scale = 1.0f;  // scale on tag velocity feed-forward
 	bool  _param_approach_use_vel  = true;  // use velocity control path in Approach
-// New parameters for moving-target handoff
+	// New parameters for moving-target handoff
 	bool  _param_use_relative_speed_gate = true;
 	float _param_descend_rel_speed_thresh = 0.6f; // m/s
 

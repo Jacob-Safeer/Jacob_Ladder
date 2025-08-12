@@ -1,155 +1,145 @@
-![](logo.jpeg)
-
-# ROS2 & PX4 Precision Landing with ArUco Markers
-Master the integration of ROS2, PX4, and OpenCV to achieve precision landing using ArUco marker detection. This tutorial delves into how to leverage ROS2's robust communication framework and PX4's flight control system to implement highly accurate landings for autonomous drones. You'll learn how to configure your environment, process camera feeds, and detect ArUco markers in real-time, enabling your drone to land precisely at designated targets. Whether you're new to drone development or an experienced engineer, this guide provides a step-by-step approach to achieving reliable precision landing with seamless integration into your ROS2 and PX4 projects.
-#### ArUco Markers
-Aruco markers are square fiducial markers used in computer vision for tasks like pose estimation, camera calibration, and augmented reality (AR). Each marker has a unique binary pattern inside a black border, allowing it to be easily detected and identified. They help in determining the position and orientation of cameras or objects in a scene, making them valuable in robotics, navigation, and AR applications.
-https://docs.opencv.org/4.x/d5/dae/tutorial_aruco_detection.html
-
-![](arucotag.png)
-
-
-### Video Walkthrough
-[Watch the video on YouTube](https://youtu.be/3BJB3OAo3tw?si=rJiTScTOzJzZjN2t)
-
+# Jacob's Ladder
+ Jacob’s Ladder is a modular, system-agnostic UAV command-and-control (C2) framework designed to operate seamlessly across varied hardware platforms running PX4. By abstracting communication between the flight computer and flight controller, it enables the same autonomy logic to run on different UAV configurations without hardware-specific rewrites. Building on the original "tracktor-beam" repository (https://github.com/ARK-Electronics/tracktor-beam), Jacob’s Ladder incorporates the PX4 ROS 2 message translation node, Docker-based development environments, and streamlined launch scripts to create a more versatile, reliable, modifiable, and shareable ROS 2 workspace for drone autonomy. This packaged approach eliminates the need for users to manually configure their machine environment, set up ROS 2 workspaces, or troubleshoot PX4 message compatibility and simulation setup issues—allowing them to focus entirely on developing autonomy algorithms and mission logic. The current implementation demonstrates this capability through a precision landing system, integrating a ROS 2–based perception and control pipeline with a hardware–software bridge for detecting, tracking, and autonomously landing on stationary or moving targets. The framework’s flexible architecture supports custom landing patterns, target tracking algorithms, and diverse sensor configurations, enabling rapid adaptation to a wide range of mission scenarios.
 
 ### Prerequisites
-* Ubuntu 22.04
-* ROS2 Humble
-* PX4 Autopilot with an ArUco Marker and downward facing camera
+* Ubuntu Linux Machine (any version)
+* Docker Engine
+* PX4 Autopilot (any version)
 * Micro XRCE-DDS Agent
 * QGroundControl Daily Build
-* OpenCV 4.10.0
-* ROS_GZ bridge
 
 You can find the required instructions collected below
+##### PX4
+Run the following command lines within your host terminal:
+```
+mkdir src
+cd src
+git clone https://github.com/PX4/PX4-Autopilot.git
+```
+The latest PX4-Autopilot is recommended, but this repository contains a message translation node that allows for compatibility with any version of PX4. However, some versions of PX4 do not contain the gazebo worlds and models necessary for simulation. If this is the case for your PX4 version, refer to the README.md contained within the gazebo folder of this repository for further instructions. 
 
-https://docs.px4.io/main/en/ros2/user_guide.html
+##### QGC
 https://docs.qgroundcontrol.com/master/en/qgc-user-guide/releases/daily_builds.html
 
-You need the lates PX4-Autopilot, that will contain the required drone with the downward facing camera and the world that has the aruco marker in it
-To get ros_gz bridge
+##### Using Jacob's Ladder
+Navigate to the directory you would like to place the workspace ans then run the following command:
 ```
-sudo apt install ros-humble-ros-gzgarden
-```
-https://github.com/gazebosim/ros_gz
-
-
-For the OpenCV part follow the instructions below
-
-## Usage
-
-### Setup the Workspace
-Make sure you source ROS2 Humble in the terminal you are using.
-```
-source /opt/ros/humble/setup.bash
-```
-OR
-Just add the line above to your bashrc, in that case it is going to be sourced every time you open a terminal.
-```
-nano ~/.bashrc
-```
-
-Navigate to the directory you would like to place the worskpace and then run the following
-```
-git clone https://github.com/ARK-Electronics/tracktor-beam.git
+git clone https://github.com/Jacob-Safeer/Jacob_Ladder.git
 ```
 Then navigate into the workspace:
 ```
-cd tracktor-beam
+cd Jacob_Ladder
 ```
-Install OpenCV from source
-```
-./install_opencv.sh 
-```
-Install the submoduls
+Install Submodules:
 ```
 git submodule update --init --recursive
 ```
-Build the workspace
+The rest of the workspace setup will be completed within the docker container.
+
+##### Docker
+Install the docker engine from the following instructions:
+https://docs.docker.com/engine/install/ubuntu/ 
+Setup and run the docker container:
 ```
+# enable access to xhost from the container
+xhost +
+
+# Run docker and open bash shell
+docker run -it --privileged \
+--env=LOCAL_USER_ID="$(id -u)" \
+-v ~/src/PX4-Autopilot:/src/PX4-Autopilot/:rw \
+-v ~/path/to/Jacob_Ladder:/path/to/Jacob_Ladder/:rw \
+-v /tmp/.X11-unix:/tmp/.X11-unix:ro \
+-e DISPLAY=:0 \
+--network host \
+--name=<local_container_name> jacobsafeer/px4-dev-harmonic-jammy-humbl-opencv-rqt:latest bash
+```
+Replace "/path/to" with the directory path to where you cloned Jacob_Ladder on your host machine. Replace "<local_container_name>" with whatever you would like to name your container.
+
+After running these command lines, your docker container will now open. Run the following commands within the docker container to complete the setup of your ros2 ws:
+```
+cd /path/to/Jacob_Ladder
+source /opt/ros/humble/setup.bash
 colcon build
 ```
-After this runs, we do not need to build the whole workspace again, you can just build the individual packages you have modified
+Now everything you need to run your simulation is set up. Exit the container and continue to the steps of running the example to verify that your setup was successful.
 
-```
-colcon build --packages-select precision_land
-```
-Source the workspace
-```
-source install/setup.bash 
-```
-### Run the example
 
-#### Run the simulation environment
-Launch PX4 sim
+### Running the example simulation
+Customize your launch bash script using the template provided:
 ```
-make px4_sitl gz_x500_mono_cam_down_aruco
+#!/bin/bash
+
+container_name="<local_container_name>"
+user="user"
+
+# Tab names
+tab_names=("PX4-SITL" "RQT-Image" "Translation-Node" "Aruco-Tracker" "Precision-Land")
+
+# Commands to run in each tab
+commands=(
+    "cd /src/PX4-Autopilot && make px4_sitl gz_x500_mono_cam_down_aruco; exec bash"
+    "cd /path/to/Jacob_Ladder && source install/setup.bash && ros2 run rqt_image_view rqt_image_view; exec bash"
+    "cd /path/to/Jacob_Ladder && source install/setup.bash && ros2 run translation_node translation_node_bin; exec bash"
+    "cd /path/to/Jacob_Ladder && source install/setup.bash && ros2 launch aruco_tracker v1_16_tracker.launch.py; exec bash"
+    "cd /path/to/Jacob_Ladder && source install/setup.bash && ros2 launch precision_land precision_land.launch.py; exec bash"
+)
+
+# Start gnome-terminal with the first tab
+docker_cmd="docker exec -it --user ${user} ${container_name} bash -c \"${commands[0]}\""
+gnome-terminal --tab --title="${tab_names[0]}" -- bash -c "${docker_cmd}"
+
+# Open the rest of the tabs
+for i in "${!commands[@]}"; do
+    if [ $i -eq 0 ]; then
+        continue
+    fi
+
+    # Add delay only for Precision-Land
+    if [ $i -eq 4 ]; then
+        docker_cmd="docker exec -it --user ${user} ${container_name} bash -c \"sleep 10; ${commands[$i]}\""
+    else
+        docker_cmd="docker exec -it --user ${user} ${container_name} bash -c \"${commands[$i]}\""
+    fi
+
+    gnome-terminal --tab --title="${tab_names[$i]}" -- bash -c "${docker_cmd}"
+    sleep 1
+done
 ```
-Launch micro dds
+Change the <local_container_name> to match the one you created. Change the command lines to fit the px4 version you are using and mission you are aiming to execute. 
+* precision_land folder 
+- in the default 'aruco' world, use precision_land.launch.py
+- in the custom 'moving_platform' world, use track_follow.launch.py
+* aruco_tracker folder
+- for px4 1.15.x, use aruco_tracker.launch.py 
+- for px4 1.16.x, 
+-- default 'aruco' world: use v1_16_tracker.launch.py 
+-- custom 'moving_platform' world, use moving_aruco.launch.py
+
+Launch QGC:
+```
+./QGroundControl.AppImage
+```
+Launch micro dds:
 ```
 MicroXRCEAgent udp4 -p 8888
 ```
+Start the docker container that corresponds to your launch bash script:
+```
+docker start <local_container_name>
+```
+Navigate to the Jacob_Ladder repo from your host terminal and run the launch bash script:
+```
+./<launch_script_name>.sh
+```
+This will open separate docker container terminals to launch each of the different programs necessary to run the simulation. 
 
-Launch the ros_gz_bridge for getting the camera topic
-```
-ros2 run ros_gz_bridge parameter_bridge /camera@sensor_msgs/msg/Image@gz.msgs.Image
-```
-
-Launch the ros_gz_bridge for getting the camera info topic (this is how we get camera intrinsics)
-```
-ros2 run ros_gz_bridge parameter_bridge /camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo
-```
-
-Launch the ros2 nodes (aruco_tracker)
-```
-cd tracktor-beam/
-source install/setup.bash 
-ros2 run aruco_tracker aruco_tracker 
-```
-OR
-Launch file with the bridges:
-```
-source install/setup.bash
-ros2 launch aruco_tracker aruco_tracker.launch.py 
-```
-
-View the video (/image_proc is the annoted image)
-```
-ros2 run rqt_image_view rqt_image_view
-```
-
-Launch the ros2 nodes (precision_land)
-```
-cd tracktor-beam/
-source install/setup.bash 
-ros2 run precision_land precision_land
-```
-OR
-Launch file with the params:
-```
-ros2 launch precision_land precision_land.launch.py
-```
-Once the nodes are running the Precision Land mode is going to show up in QGC
 
 ![](Precision.png)
 
-## ARK Electronics
-For more open-source drone-related material, follow us on LinkedIn and Twitter:
-
-[LinkedIn](https://www.linkedin.com/company/ark-electronics-llc/)
-
-[X](https://x.com/ark_electr0nics)
-
-If you're interested in US-manufactured drone hardware, please visit our webpage:
-
-[ARK Electronics](https://arkelectron.com/)
 
 ## Questions
-Message Patrik Dominik Pordi on the ARK Electronics / Dronecode Foundation Discord for questions or email me at patrik@arkelectron.com
-
-[ARK Electronics Discord](https://discord.gg/un4HYu8k)
-
+email me at jsafeer1@terpmail.umd.edu
 
 ## Additional resources
 [LinuxCheatSheet](https://www.geeksforgeeks.org/linux-commands-cheat-sheet/)

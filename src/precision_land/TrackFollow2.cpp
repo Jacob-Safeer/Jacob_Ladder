@@ -48,11 +48,11 @@ void TrackFollow::loadParameters()
 	_node.declare_parameter<float>("vel_i_gain", 0.0);
 	_node.declare_parameter<float>("max_velocity", 3.0);
 	_node.declare_parameter<float>("target_timeout", 3.0);
-	_node.declare_parameter<float>("delta_position", 0.25);
+	_node.declare_parameter<float>("delta_position", 1.25);
 	_node.declare_parameter<float>("delta_velocity", 0.25);
 
 	// New parameters for moving target handoff
-	_node.declare_parameter<bool>("use_relative_speed_gate", false);
+	_node.declare_parameter<bool>("use_relative_speed_gate", true);
 	_node.declare_parameter<float>("descend_rel_speed_thresh", 0.6);
 
 	_node.get_parameter("descent_vel", _param_descent_vel);
@@ -65,6 +65,16 @@ void TrackFollow::loadParameters()
 
 	_node.get_parameter("use_relative_speed_gate", _param_use_relative_speed_gate);
 	_node.get_parameter("descend_rel_speed_thresh", _param_descend_rel_speed_thresh);
+
+	// --- NEW (Search behavior params) ---
+	_node.declare_parameter<float>("search_climb_speed", 0.7f);   // m/s upward (NED vz is negative)
+	_node.declare_parameter<float>("search_min_z", -15.0f);       // NED z floor (e.g., -15 m = climb up to 15 m AGL-ish)
+
+	_node.get_parameter("search_climb_speed", _param_search_climb_speed);
+	_node.get_parameter("search_min_z", _param_search_min_z);
+
+	RCLCPP_INFO(_node.get_logger(), "search_climb_speed: %f", _param_search_climb_speed);
+	RCLCPP_INFO(_node.get_logger(), "search_min_z: %f", _param_search_min_z);
 
 	RCLCPP_INFO(_node.get_logger(), "descent_vel: %f", _param_descent_vel);
 	RCLCPP_INFO(_node.get_logger(), "vel_i_gain: %f", _param_vel_i_gain);
@@ -138,7 +148,6 @@ TrackFollow::ArucoTag TrackFollow::getTagWorld(const ArucoTag& tag)
 
 void TrackFollow::onActivate()
 {
-	generateSearchWaypoints();
 	_search_started = true;
 	switchToState(State::Search);
 }
@@ -169,23 +178,36 @@ void TrackFollow::updateSetpoint(float dt_s)
 
 	case State::Search: {
 
+		// If we see the tag, lock current altitude and go to Approach
 		if (!std::isnan(_tag.position.x())) {
-			_approach_altitude = _vehicle_local_position->positionNed().z();
+			_approach_altitude = _vehicle_local_position->positionNed().z(); // hold here
 			switchToState(State::Approach);
 			break;
 		}
 
-		auto waypoint_position = _search_waypoints[_search_waypoint_index];
+		// Otherwise: climb straight up (NED frame => up = negative vz)
+		const float vz_up = -std::abs(_param_search_climb_speed);
 
-		_trajectory_setpoint->updatePosition(waypoint_position);
+		// Hold XY where we are, command only Z velocity upward
+		_trajectory_setpoint->update(
+			Eigen::Vector3f(0.0f, 0.0f, vz_up),
+			std::nullopt,
+			px4_ros2::quaternionToYaw(_vehicle_attitude->attitude()) // keep current yaw
+		);
 
-		if (positionReached(waypoint_position)) {
-			_search_waypoint_index++;
+		// Safety stop: don't climb above configured min_z (more negative = higher)
+		const float z_now = _vehicle_local_position->positionNed().z();
+		if (z_now <= _param_search_min_z) {
+			RCLCPP_WARN(_node.get_logger(),
+						"Search reached z=%.2f (limit %.2f) without seeing tag. Holding altitude.",
+						z_now, _param_search_min_z);
 
-			// If we have searched all waypoints, start over
-			if (_search_waypoint_index >= static_cast<int>(_search_waypoints.size())) {
-				_search_waypoint_index = 0;
-			}
+			// Hold hover at current altitude (zero velocity cmd)
+			_trajectory_setpoint->update(
+				Eigen::Vector3f(0.0f, 0.0f, 0.0f),
+				std::nullopt,
+				px4_ros2::quaternionToYaw(_vehicle_attitude->attitude())
+			);
 		}
 
 		break;
@@ -200,24 +222,73 @@ void TrackFollow::updateSetpoint(float dt_s)
 			return;
 		}
 
-		// Approach using position setpoints, constantly chasing current tag XY at fixed altitude
-		const auto target_position = Eigen::Vector3f(
+		// --- NEW: Lead + feed-forward approach to catch up and stay overhead ---
+		// Current tag pose (world)
+		const Eigen::Vector2f tag_xy{
 			static_cast<float>(_tag.position.x()),
-			static_cast<float>(_tag.position.y()),
-			_approach_altitude
-		);
+			static_cast<float>(_tag.position.y())
+		};
 
-		_trajectory_setpoint->updatePosition(target_position);
+		// Predicted tag position with lookahead (clamped)
+		Eigen::Vector2f lead = _tag_xy_vel * _param_approach_lead_time;
+		const float lead_norm = lead.norm();
+		if (lead_norm > _param_approach_lead_max && lead_norm > 1e-3f) {
+			lead *= (_param_approach_lead_max / lead_norm);
+		}
+		const Eigen::Vector2f aim_xy = tag_xy + lead;
 
-		// Compute relative XY speed (vehicle - tag)
+		// Vehicle position (world)
+		const Eigen::Vector2f veh_xy{
+			_vehicle_local_position->positionNed().x(),
+			_vehicle_local_position->positionNed().y()
+		};
+
+		// XY velocity command (feed-forward tag vel + P on position error)
+		Eigen::Vector2f v_cmd = _param_approach_ff_scale * _tag_xy_vel
+		                      + _param_approach_p_gain * (aim_xy - veh_xy);
+
+		// Saturate commanded speed
+		const float vmag = v_cmd.norm();
+		if (vmag > _param_approach_max_vel && vmag > 1e-3f) {
+			v_cmd *= (_param_approach_max_vel / vmag);
+		}
+
+		// Issue setpoint:
+		// If velocity control is enabled, send a velocity XY + hold altitude.
+		// Otherwise, send the predicted aim position at fixed altitude.
+		if (_param_approach_use_vel) {
+			px4_msgs::msg::TrajectorySetpoint sp{};
+			sp.position[0] = std::numeric_limits<float>::quiet_NaN(); // don't constrain XY pos
+			sp.position[1] = std::numeric_limits<float>::quiet_NaN();
+			sp.position[2] = _approach_altitude; // hold height
+			sp.velocity[0] = v_cmd.x();
+			sp.velocity[1] = v_cmd.y();
+			sp.velocity[2] = 0.0f;
+			_trajectory_setpoint->update(
+				Eigen::Vector3f(v_cmd.x(), v_cmd.y(), 0.0f),   // XY velocity, hold Z by v_z = 0
+				std::nullopt,                                   // no absolute position setpoint
+				px4_ros2::quaternionToYaw(_tag.orientation)     // face the tag
+			);
+
+		} else {
+			const Eigen::Vector3f aim_pos3(aim_xy.x(), aim_xy.y(), _approach_altitude);
+			_trajectory_setpoint->updatePosition(aim_pos3);
+		}
+
+		// Compute relative XY speed (vehicle - tag) for the descend gate
 		const Eigen::Vector2f veh_vxy{
 			_vehicle_local_position->velocityNed().x(),
 			_vehicle_local_position->velocityNed().y()
 		};
 		const float rel_speed = (veh_vxy - _tag_xy_vel).norm();
 
-		// Exit criteria: close laterally AND (optionally) relative speed small
-		const bool close_xy = xyDistanceTo(target_position, _param_delta_position);
+		// Exit criteria: close to ACTUAL tag (not the aim point) AND speed gate if enabled
+		const Eigen::Vector3f tag_pos3(
+			static_cast<float>(_tag.position.x()),
+			static_cast<float>(_tag.position.y()),
+			_approach_altitude
+		);
+		const bool close_xy = xyDistanceTo(tag_pos3, _param_delta_position);
 		const bool speed_ok = (!_param_use_relative_speed_gate) ||
 		                      (rel_speed < _param_descend_rel_speed_thresh);
 
@@ -227,8 +298,7 @@ void TrackFollow::updateSetpoint(float dt_s)
 
 		break;
 	}
-
-	case State::Descend: {
+case State::Descend: {
 
 		if (target_lost) {
 			RCLCPP_INFO(_node.get_logger(), "Failed! Target lost during %s", stateName(_state).c_str());
@@ -302,63 +372,6 @@ bool TrackFollow::checkTargetTimeout()
 	}
 
 	return false;
-}
-
-void TrackFollow::generateSearchWaypoints()
-{
-	// Generate spiral search waypoints in NED
-	double start_x = 0.0;
-	double start_y = 0.0;
-	double current_z = _vehicle_local_position->positionNed().z();
-	auto min_z = -1.0;
-
-	double max_radius = 2.0;
-	double layer_spacing = 0.5;
-	int points_per_layer = 16;
-	std::vector<Eigen::Vector3f> waypoints;
-
-	// Calculate number of layers
-	int num_layers = (static_cast<int>((min_z - current_z) / layer_spacing) / 2) < 1 ?
-	                 1 : (static_cast<int>((min_z - current_z) / layer_spacing) / 2);
-
-	for (int layer = 0; layer < num_layers; ++layer) {
-		std::vector<Eigen::Vector3f> layer_waypoints;
-
-		// Spiral out to max radius
-		double radius = 0.0;
-
-		for (int point = 0; point < points_per_layer + 1; ++point) {
-			double angle = 2.0 * M_PI * point / points_per_layer;
-			double x = start_x + radius * cos(angle);
-			double y = start_y + radius * sin(angle);
-			double z = current_z;
-
-			layer_waypoints.push_back(Eigen::Vector3f(x, y, z));
-			radius += max_radius / points_per_layer;
-		}
-
-		// push outwards
-		waypoints.insert(waypoints.end(), layer_waypoints.begin(), layer_waypoints.end());
-
-		// go down a layer for inward spiral
-		current_z += layer_spacing;
-
-		// reverse for inward spiral
-		std::reverse(layer_waypoints.begin(), layer_waypoints.end());
-
-		// adjust z for inward
-		for (auto& waypoint : layer_waypoints) {
-			waypoint.z() = static_cast<float>(current_z);
-		}
-
-		// push inward
-		waypoints.insert(waypoints.end(), layer_waypoints.begin(), layer_waypoints.end());
-
-		// next outward layer depth
-		current_z += layer_spacing;
-	}
-
-	_search_waypoints = waypoints;
 }
 
 bool TrackFollow::positionReached(const Eigen::Vector3f& target) const

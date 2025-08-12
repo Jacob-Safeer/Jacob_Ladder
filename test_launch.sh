@@ -35,4 +35,3 @@ for i in "${!commands[@]}"; do
     gnome-terminal --tab --title="${tab_names[$i]}" -- bash -c "${docker_cmd}"
     sleep 1
 done
-
