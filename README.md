@@ -1,15 +1,15 @@
 # Jacob's Ladder
  Jacob’s Ladder is a modular, system-agnostic UAV command-and-control (C2) framework designed to operate seamlessly across varied hardware platforms running PX4. By abstracting communication between the flight computer and flight controller, it enables the same autonomy logic to run on different UAV configurations without hardware-specific rewrites. Building on the original "tracktor-beam" repository (https://github.com/ARK-Electronics/tracktor-beam), Jacob’s Ladder incorporates the PX4 ROS 2 message translation node, Docker-based development environments, and streamlined launch scripts to create a more versatile, reliable, modifiable, and shareable ROS 2 workspace for drone autonomy. This packaged approach eliminates the need for users to manually configure their machine environment, set up ROS 2 workspaces, or troubleshoot PX4 message compatibility and simulation setup issues—allowing them to focus entirely on developing autonomy algorithms and mission logic. The current implementation demonstrates this capability through a precision landing system, integrating a ROS 2–based perception and control pipeline with a hardware–software bridge for detecting, tracking, and autonomously landing on stationary or moving targets. The framework’s flexible architecture supports custom landing patterns, target tracking algorithms, and diverse sensor configurations, enabling rapid adaptation to a wide range of mission scenarios.
 
-### Prerequisites
+## Prerequisites
 * Ubuntu Linux Machine (any version)
 * Docker Engine
 * PX4 Autopilot (any version)
-* Micro XRCE-DDS Agent
+* Micro XRCE-DDS Agent (version 2.4.3)
 * QGroundControl Daily Build
 
 You can find the required instructions collected below
-##### PX4
+### PX4
 Run the following command lines within your host terminal:
 ```
 mkdir src
@@ -18,11 +18,12 @@ git clone https://github.com/PX4/PX4-Autopilot.git
 ```
 The latest PX4-Autopilot is recommended, but this repository contains a message translation node that allows for compatibility with any version of PX4. However, some versions of PX4 do not contain the gazebo worlds and models necessary for simulation. If this is the case for your PX4 version, refer to the README.md contained within the gazebo folder of this repository for further instructions. 
 
-##### QGC
+### QGC
+Install using the link below:
 https://docs.qgroundcontrol.com/master/en/qgc-user-guide/releases/daily_builds.html
 
-##### Using Jacob's Ladder
-Navigate to the directory you would like to place the workspace ans then run the following command:
+### Using Jacob's Ladder
+Navigate to the directory you would like to place the workspace and then run the following command:
 ```
 git clone https://github.com/Jacob-Safeer/Jacob_Ladder.git
 ```
@@ -36,9 +37,12 @@ git submodule update --init --recursive
 ```
 The rest of the workspace setup will be completed within the docker container.
 
-##### Docker
+### Docker
+Within the docker/ directory of this repository, you’ll find a stack of Dockerfiles designed to streamline setup and ensure a consistent development environment. The base image is built from px4io/px4-dev-base-jammy, with successive layers adding all dependencies required to run the full Jacob_Ladder workspace. By using these prebuilt images, available on my Docker Hub (https://hub.docker.com/repositories/jacobsafeer), users can skip tedious installation steps, avoid ROS 2 message compatibility pitfalls, and bypass common simulation setup headaches. The environment is fully encapsulated, so you can focus entirely on developing autonomy algorithms and mission logic—without worrying about local machine configuration or dependency management. Follow the instructions below to properly utilize my docker image:
+
 Install the docker engine from the following instructions:
 https://docs.docker.com/engine/install/ubuntu/ 
+
 Setup and run the docker container:
 ```
 # enable access to xhost from the container
@@ -52,9 +56,9 @@ docker run -it --privileged \
 -v /tmp/.X11-unix:/tmp/.X11-unix:ro \
 -e DISPLAY=:0 \
 --network host \
---name=<local_container_name> jacobsafeer/px4-dev-harmonic-jammy-humbl-opencv-rqt:latest bash
+--name=<local_container_name> jacobsafeer/px4-dev-harmonic-jammy-humble-opencv-rqt:latest bash
 ```
-Replace "/path/to" with the directory path to where you cloned Jacob_Ladder on your host machine. Replace "<local_container_name>" with whatever you would like to name your container.
+Replace "/path/to" with your directory path to where you cloned Jacob_Ladder on your host machine. Replace "<local_container_name>" with whatever you would like to name your container.
 
 After running these command lines, your docker container will now open. Run the following commands within the docker container to complete the setup of your ros2 ws:
 ```
@@ -65,7 +69,7 @@ colcon build
 Now everything you need to run your simulation is set up. Exit the container and continue to the steps of running the example to verify that your setup was successful.
 
 
-### Running the example simulation
+## Running the example simulation
 Customize your launch bash script using the template provided:
 ```
 #!/bin/bash
@@ -107,14 +111,14 @@ for i in "${!commands[@]}"; do
 done
 ```
 Change the <local_container_name> to match the one you created. Change the command lines to fit the px4 version you are using and mission you are aiming to execute. 
-* precision_land folder 
-- in the default 'aruco' world, use precision_land.launch.py
-- in the custom 'moving_platform' world, use track_follow.launch.py
-* aruco_tracker folder
-- for px4 1.15.x, use aruco_tracker.launch.py 
-- for px4 1.16.x, 
--- default 'aruco' world: use v1_16_tracker.launch.py 
--- custom 'moving_platform' world, use moving_aruco.launch.py
+* precision_land tab 
+    - in the default 'aruco' world, use precision_land.launch.py
+    - in the custom 'moving_platform' world, use track_follow.launch.py
+* aruco_tracker tab
+    - for px4 1.15.x, use aruco_tracker.launch.py 
+    - for px4 1.16.x, 
+        + default 'aruco' world, use v1_16_tracker.launch.py 
+        + custom 'moving_platform' world, use moving_aruco.launch.py
 
 Launch QGC:
 ```
