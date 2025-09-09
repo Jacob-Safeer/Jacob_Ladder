@@ -2,7 +2,7 @@
 # Dockerfile for working px4, ubuntu jammy, and gazebo harmonic simulation
 
 FROM px4io/px4-dev-base-jammy:2024-05-18
-LABEL maintainer="Jacob Safeer <jesafeer@gmail.com>"
+LABEL maintainer="Jacob Safeer <jsafeer1@terpmail.umd.edu>"
 
 # Add Gazebo Harmonic apt repository and key
 RUN wget https://packages.osrfoundation.org/gazebo.gpg -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg \

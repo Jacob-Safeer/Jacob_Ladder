@@ -1,0 +1,64 @@
+# syntax=docker/dockerfile:1
+###############################################################################
+# ROS 2 Humble + Gazebo Harmonic bridge on top of PX4‑dev base image
+###############################################################################
+FROM jacobsafeer/px4-dev-base-jammy:arm64
+
+# ---------------------------------------------------------------------------
+# 0.  Environment
+# ---------------------------------------------------------------------------
+ARG DEBIAN_FRONTEND=noninteractive
+ENV TZ=Etc/UTC \
+    LANG=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8 \
+    ROS_DISTRO=humble \
+    GZ_VERSION=harmonic
+
+# ---------------------------------------------------------------------------
+# 1.  Base utilities + locale
+# ---------------------------------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl gnupg2 lsb-release locales \
+    && locale-gen en_US en_US.UTF-8 \
+    && update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
+
+# ---------------------------------------------------------------------------
+# 2.  Add the official ROS apt repository + install ROS 2 Humble
+#     (follows the “ros-apt-source” mechanism you quoted)
+# ---------------------------------------------------------------------------
+RUN export ROS_APT_SOURCE_VERSION="$(curl -s https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/latest \
+         | grep -F \"tag_name\" | awk -F'\"' '{print $4}')" && \
+    curl -L -o /tmp/ros2-apt-source.deb \
+         "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/ros2-apt-source_${ROS_APT_SOURCE_VERSION}.$(. /etc/os-release && echo $VERSION_CODENAME)_all.deb" && \
+    dpkg -i /tmp/ros2-apt-source.deb && rm /tmp/ros2-apt-source.deb && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends ros-${ROS_DISTRO}-desktop && \
+    rm -rf /var/lib/apt/lists/*
+
+# Make every Bash session pick up ROS automatically
+SHELL ["/bin/bash", "-c"]
+RUN echo 'source /opt/ros/${ROS_DISTRO}/setup.bash' >> /etc/bash.bashrc
+
+# ---------------------------------------------------------------------------
+# 3.  Add the packages.osrfoundation.org repo and install ros‑gz for Harmonic
+#     (non‑official binaries that couple Humble ↔ Harmonic)               🛈
+# ---------------------------------------------------------------------------
+RUN curl -sSL https://packages.osrfoundation.org/gazebo.gpg -o /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] \
+         http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" \
+         > /etc/apt/sources.list.d/gazebo-stable.list && \
+    apt-get update && \
+    # Installs Gazebo Harmonic *and* the ROS bridge matching Humble
+    apt-get install -y --no-install-recommends \
+         gz-harmonic \
+         ros-${ROS_DISTRO}-ros-gzharmonic && \
+    rm -rf /var/lib/apt/lists/*
+
+# ---------------------------------------------------------------------------
+# 4.  (Optional) tooling for building workspaces inside the container
+# ---------------------------------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3-vcstool python3-colcon-common-extensions git && \
+    rm -rf /var/lib/apt/lists/*
+
+CMD ["/bin/bash"]
