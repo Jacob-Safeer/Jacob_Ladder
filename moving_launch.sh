@@ -4,11 +4,12 @@ container_name="px4-latest"
 user="user"
 
 # Tab names
-tab_names=("PX4-SITL" "RQT-Image" "Translation-Node" "Aruco-Tracker" "Precision-Land")
+tab_names=("PX4-SITL" "DDS-Agent" "RQT-Image" "Translation-Node" "Aruco-Tracker" "Precision-Land")
 
 # Commands to run in each tab
 commands=(
-    "cd /src/PX4-Autopilot && make px4_sitl gz_x500_mono_cam_down_moving_platform; exec bash"
+    "cd /src/PX4-Autopilot && make px4_sitl gz_x500_mono_cam_down_moving_platform ARGS="--follow"; exec bash"
+    "cd /aruco_land/Jacob_Ladder && source install/setup.bash && MicroXRCEAgent udp4 -p 8888; exec bash"
     "cd /aruco_land/Jacob_Ladder && source install/setup.bash && ros2 run rqt_image_view rqt_image_view; exec bash"
     "cd /aruco_land/Jacob_Ladder && source install/setup.bash && ros2 run translation_node translation_node_bin; exec bash"
     "cd /aruco_land/Jacob_Ladder && source install/setup.bash && ros2 launch aruco_tracker moving_aruco.launch.py; exec bash"
@@ -27,7 +28,7 @@ for i in "${!commands[@]}"; do
 
     # Add delay only for Precision-Land
     if [ $i -eq 4 ]; then
-        docker_cmd="docker exec -it --user ${user} ${container_name} bash -c \"sleep 10; ${commands[$i]}\""
+        docker_cmd="docker exec -it --user ${user} ${container_name} bash -c \"sleep 15; ${commands[$i]}\""
     else
         docker_cmd="docker exec -it --user ${user} ${container_name} bash -c \"${commands[$i]}\""
     fi
