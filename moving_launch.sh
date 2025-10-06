@@ -8,7 +8,7 @@ tab_names=("PX4-SITL" "DDS-Agent" "RQT-Image" "Translation-Node" "Aruco-Tracker"
 
 # Commands to run in each tab
 commands=(
-    "cd /src/PX4-Autopilot && make px4_sitl gz_x500_mono_cam_down_moving_platform ARGS="--follow"; exec bash"
+    "cd /src/PX4-Autopilot && make px4_sitl gz_x500_mono_cam_down_moving_platform; exec bash"
     "cd /aruco_land/Jacob_Ladder && source install/setup.bash && MicroXRCEAgent udp4 -p 8888; exec bash"
     "cd /aruco_land/Jacob_Ladder && source install/setup.bash && ros2 run rqt_image_view rqt_image_view; exec bash"
     "cd /aruco_land/Jacob_Ladder && source install/setup.bash && ros2 run translation_node translation_node_bin; exec bash"

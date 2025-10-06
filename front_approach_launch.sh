@@ -4,16 +4,15 @@ container_name="px4-test"
 user="user"
 
 # Tab names
-tab_names=("PX4-SITL" "DDS-Agent" "RQT-Image" "Translation-Node" "Aruco-Tracker" "Precision-Land")
+tab_names=("PX4-SITL" "DDS-Agent" "RQT-Image" "Translation-Node" "Front-Tracker" "Front-Approach")
 
-# Commands to run in each tab
 commands=(
-    "cd /test/PX4-Autopilot && make px4_sitl gz_x500_dual_cam_aruco_dual; exec bash"
+    "cd /test/PX4-Autopilot && make px4_sitl gz_x500_dual_cam_aruco_dual_ids; exec bash"
     "cd /aruco_land/Jacob_Ladder && source install/setup.bash && MicroXRCEAgent udp4 -p 8888; exec bash"
     "cd /aruco_land/Jacob_Ladder && source install/setup.bash && ros2 run rqt_image_view rqt_image_view; exec bash"
     "cd /aruco_land/Jacob_Ladder && source install/setup.bash && ros2 run translation_node translation_node_bin; exec bash"
-    "cd /aruco_land/Jacob_Ladder && source install/setup.bash && ros2 launch aruco_tracker v1_16_tracker.launch.py; exec bash"
-    "cd /aruco_land/Jacob_Ladder && source install/setup.bash && ros2 launch precision_land precision_land.launch.py; exec bash"
+    "cd /aruco_land/Jacob_Ladder && source install/setup.bash && ros2 launch aruco_tracker front_camera_aruco.launch.py; exec bash"
+    "cd /aruco_land/Jacob_Ladder && source install/setup.bash && ros2 launch precision_land front_approach_pid_precision_land.launch.py; exec bash"
 )
 
 # Start gnome-terminal with the first tab
@@ -36,3 +35,4 @@ for i in "${!commands[@]}"; do
     gnome-terminal --tab --title="${tab_names[$i]}" -- bash -c "${docker_cmd}"
     sleep 1
 done
+

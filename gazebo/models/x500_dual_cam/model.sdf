@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sdf version='1.9'>
+  <model name='x500_dual_cam'>
+    <self_collide>false</self_collide>
+    <include merge='true'>
+      <uri>x500</uri>
+    </include>
+
+    <link name="front_camera_link">
+      <inertial>
+        <pose>0.03 0.03 0.03 0 0 0</pose>
+        <mass>0.050</mass>
+        <inertia>
+          <ixx>0.00004</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.00004</iyy>
+          <iyz>0</iyz>
+          <izz>0.00004</izz>
+        </inertia>
+      </inertial>
+      <visual name="front_camera/visual/housing">
+        <geometry>
+          <box>
+            <size>0.02 0.04 0.04</size>
+          </box>
+        </geometry>
+      </visual>
+      <visual name="front_camera/visual/lens">
+        <pose>0.015 0 0 0 1.5707 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.008</radius>
+            <length>0.01</length>
+          </cylinder>
+        </geometry>
+      </visual>
+      <visual name="front_camera/visual/lens_glass">
+        <pose>0.014 0 0 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.0079</radius>
+          </sphere>
+        </geometry>
+        <material>
+          <ambient>.4 .4 .5 .95</ambient>
+          <diffuse>.4 .4 .5 .95</diffuse>
+          <specular>1 1 1 1</specular>
+          <emissive>0 0 0 1</emissive>
+        </material>
+      </visual>
+      <sensor name="front_camera" type="camera">
+        <pose>0 0 0 0 0 0</pose>
+        <camera>
+          <horizontal_fov>1.74</horizontal_fov>
+          <image>
+            <width>1280</width>
+            <height>960</height>
+          </image>
+          <clip>
+            <near>0.1</near>
+            <far>3000</far>
+          </clip>
+        </camera>
+        <always_on>1</always_on>
+        <update_rate>30</update_rate>
+        <visualize>true</visualize>
+      </sensor>
+      <gravity>true</gravity>
+      <velocity_decay/>
+    </link>
+
+    <link name="down_camera_link">
+      <inertial>
+        <pose>0.03 0.03 0.03 0 0 0</pose>
+        <mass>0.050</mass>
+        <inertia>
+          <ixx>0.00004</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.00004</iyy>
+          <iyz>0</iyz>
+          <izz>0.00004</izz>
+        </inertia>
+      </inertial>
+      <visual name="down_camera/visual/housing">
+        <geometry>
+          <box>
+            <size>0.02 0.04 0.04</size>
+          </box>
+        </geometry>
+      </visual>
+      <visual name="down_camera/visual/lens">
+        <pose>0 0 -0.015 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.008</radius>
+            <length>0.01</length>
+          </cylinder>
+        </geometry>
+      </visual>
+      <visual name="down_camera/visual/lens_glass">
+        <pose>0 0 -0.014 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.0079</radius>
+          </sphere>
+        </geometry>
+        <material>
+          <ambient>.4 .4 .5 .95</ambient>
+          <diffuse>.4 .4 .5 .95</diffuse>
+          <specular>1 1 1 1</specular>
+          <emissive>0 0 0 1</emissive>
+        </material>
+      </visual>
+      <sensor name="down_camera" type="camera">
+        <pose>0 0 0 0 1.5707 0</pose>
+        <camera>
+          <horizontal_fov>1.74</horizontal_fov>
+          <image>
+            <width>1280</width>
+            <height>960</height>
+          </image>
+          <clip>
+            <near>0.1</near>
+            <far>3000</far>
+          </clip>
+        </camera>
+        <always_on>1</always_on>
+        <update_rate>30</update_rate>
+        <visualize>true</visualize>
+      </sensor>
+      <gravity>true</gravity>
+      <velocity_decay/>
+    </link>
+
+    <joint name="front_camera_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>front_camera_link</child>
+      <pose relative_to="base_link">0.12 0.03 0.242 0 0 0</pose>
+    </joint>
+
+    <joint name="down_camera_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>down_camera_link</child>
+      <pose relative_to="base_link">0 0 0.10 0 1.5707 0</pose>
+    </joint>
+  </model>
+</sdf>
