@@ -132,8 +132,14 @@ Navigate to the Jacob_Ladder repo from your host terminal and run the launch bas
 ```
 ./<launch_script_name>.sh
 ```
-This will open separate docker container terminals to launch each of the different programs necessary to run the simulation. 
-
+This will open separate docker container terminals to launch each of the different programs necessary to run the simulation. If you previously ran make px4_sitl in your local repo, you may need to run the following line in the px4-Autopilot directory within the running container:
+```
+rm -rf build/px4_sitl_default
+```
+After doing this, stop the container and repeat the steps to start the container and run the launch script:
+```
+docker stop <local_container_name>
+```
 Activate the precision landing custom mode by selecting it from the dropdown bar in QGC as pictured below:
 
 ![](Precision.png)
