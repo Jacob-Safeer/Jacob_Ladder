@@ -12,7 +12,7 @@ commands=(
     "cd /aruco_land/Jacob_Ladder && source install/setup.bash && ros2 run rqt_image_view rqt_image_view; exec bash"
     "cd /aruco_land/Jacob_Ladder && source install/setup.bash && ros2 run translation_node translation_node_bin; exec bash"
     "cd /aruco_land/Jacob_Ladder && source install/setup.bash && ros2 launch aruco_tracker front_camera_aruco.launch.py; exec bash"
-    "cd /aruco_land/Jacob_Ladder && source install/setup.bash && ros2 launch precision_land front_approach_pid_precision_land.launch.py; exec bash"
+    "cd /aruco_land/Jacob_Ladder && source install/setup.bash && ros2 launch precision_land front_approach.launch.py; exec bash"
 )
 
 # Start gnome-terminal with the first tab
@@ -35,4 +35,3 @@ for i in "${!commands[@]}"; do
     gnome-terminal --tab --title="${tab_names[$i]}" -- bash -c "${docker_cmd}"
     sleep 1
 done
-

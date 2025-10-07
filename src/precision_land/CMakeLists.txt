@@ -32,18 +32,11 @@ ament_target_dependencies(track_follow rclcpp Eigen3 px4_ros2_cpp geometry_msgs 
 target_compile_features(track_follow PUBLIC c_std_99 cxx_std_17)
 
 # Front camera approach mission
-add_executable(front_approach_precision_land
-    FrontApproachPrecisionLand.cpp
+add_executable(front_approach
+    FrontApproach.cpp
 )
-ament_target_dependencies(front_approach_precision_land rclcpp Eigen3 px4_ros2_cpp geometry_msgs tf2_ros tf2)
-target_compile_features(front_approach_precision_land PUBLIC c_std_99 cxx_std_17)
-
-# Front camera PID approach mission
-add_executable(front_approach_pid_precision_land
-    FrontApproachPIDPrecisionLand.cpp
-)
-ament_target_dependencies(front_approach_pid_precision_land rclcpp Eigen3 px4_ros2_cpp geometry_msgs tf2_ros tf2)
-target_compile_features(front_approach_pid_precision_land PUBLIC c_std_99 cxx_std_17)
+ament_target_dependencies(front_approach rclcpp Eigen3 px4_ros2_cpp geometry_msgs tf2_ros tf2)
+target_compile_features(front_approach PUBLIC c_std_99 cxx_std_17)
 
 # Combined front approach + precision land mission
 add_executable(front_to_precision_land
@@ -56,8 +49,7 @@ target_compile_features(front_to_precision_land PUBLIC c_std_99 cxx_std_17)
 install(TARGETS
   precision_land
   track_follow
-  front_approach_precision_land
-  front_approach_pid_precision_land
+  front_approach
   front_to_precision_land
   DESTINATION lib/${PROJECT_NAME}
 )

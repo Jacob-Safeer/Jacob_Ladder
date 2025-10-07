@@ -1,4 +1,4 @@
-front_approach_pid_precision_land:
+front_approach:
   ros__parameters:
     front_hold_distance: 1.0
     front_delta_position: 0.25

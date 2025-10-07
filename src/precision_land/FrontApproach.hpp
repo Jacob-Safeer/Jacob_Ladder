@@ -17,13 +17,13 @@
 namespace precision_land
 {
 
-inline constexpr char kFrontApproachPidModeName[] = "FrontApproachLandPID";
-inline constexpr bool kFrontApproachPidDebugOutput = true;
+inline constexpr char kFrontApproachModeName[] = "FrontApproach";
+inline constexpr bool kFrontApproachDebugOutput = true;
 
-class FrontApproachPIDPrecisionLand : public px4_ros2::ModeBase
+class FrontApproach : public px4_ros2::ModeBase
 {
 public:
-	explicit FrontApproachPIDPrecisionLand(rclcpp::Node& node);
+	explicit FrontApproach(rclcpp::Node& node);
 
 	void onActivate() override;
 	void onDeactivate() override;
@@ -100,4 +100,3 @@ private:
 };
 
 } // namespace precision_land
-

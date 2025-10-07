@@ -1,4 +1,4 @@
-#include "FrontApproachPIDPrecisionLand.hpp"
+#include "FrontApproach.hpp"
 
 #include <px4_ros2/components/node_with_mode.hpp>
 #include <px4_ros2/utils/geometry.hpp>
@@ -9,8 +9,8 @@
 namespace precision_land
 {
 
-FrontApproachPIDPrecisionLand::FrontApproachPIDPrecisionLand(rclcpp::Node& node)
-	: ModeBase(node, ModeBase::Settings{kFrontApproachPidModeName})
+FrontApproach::FrontApproach(rclcpp::Node& node)
+	: ModeBase(node, ModeBase::Settings{kFrontApproachModeName})
 	, _node(node)
 {
 	setSkipMessageCompatibilityCheck();
@@ -22,7 +22,7 @@ FrontApproachPIDPrecisionLand::FrontApproachPIDPrecisionLand(rclcpp::Node& node)
 	auto qos = rclcpp::QoS(1).best_effort();
 	_front_target_sub = _node.create_subscription<geometry_msgs::msg::PoseStamped>(
 		"/front/target_pose", qos,
-		std::bind(&FrontApproachPIDPrecisionLand::frontTargetCallback, this, std::placeholders::_1));
+		std::bind(&FrontApproach::frontTargetCallback, this, std::placeholders::_1));
 
 	Eigen::Matrix3d front_matrix;
 	front_matrix << 0, 0, 1,
@@ -33,7 +33,7 @@ FrontApproachPIDPrecisionLand::FrontApproachPIDPrecisionLand(rclcpp::Node& node)
 	loadParameters();
 }
 
-void FrontApproachPIDPrecisionLand::loadParameters()
+void FrontApproach::loadParameters()
 {
 	_node.declare_parameter<float>("front_hold_distance", 1.0f);
 	_node.declare_parameter<float>("front_delta_position", 0.25f);
@@ -64,7 +64,7 @@ void FrontApproachPIDPrecisionLand::loadParameters()
 	_node.get_parameter("front_pid_max_velocity_z", _param_max_velocity_z);
 }
 
-void FrontApproachPIDPrecisionLand::frontTargetCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+void FrontApproach::frontTargetCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
 {
 	ArucoTag tag;
 	tag.position = Eigen::Vector3d(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
@@ -103,7 +103,7 @@ void FrontApproachPIDPrecisionLand::frontTargetCallback(const geometry_msgs::msg
 	_front_tag.timestamp = tag.timestamp;
 }
 
-void FrontApproachPIDPrecisionLand::onActivate()
+void FrontApproach::onActivate()
 {
 	_front_tag = {};
 	_target_lost_prev = true;
@@ -111,12 +111,12 @@ void FrontApproachPIDPrecisionLand::onActivate()
 	switchToState(State::Search);
 }
 
-void FrontApproachPIDPrecisionLand::onDeactivate()
+void FrontApproach::onDeactivate()
 {
 	resetController();
 }
 
-void FrontApproachPIDPrecisionLand::updateSetpoint(float dt_s)
+void FrontApproach::updateSetpoint(float dt_s)
 {
 	auto now = _node.now();
 	bool target_lost = targetExpired(now);
@@ -221,7 +221,7 @@ void FrontApproachPIDPrecisionLand::updateSetpoint(float dt_s)
 	}
 }
 
-FrontApproachPIDPrecisionLand::ArucoTag FrontApproachPIDPrecisionLand::transformTagToWorld(const ArucoTag& tag) const
+FrontApproach::ArucoTag FrontApproach::transformTagToWorld(const ArucoTag& tag) const
 {
 	ArucoTag world = tag;
 
@@ -243,7 +243,7 @@ FrontApproachPIDPrecisionLand::ArucoTag FrontApproachPIDPrecisionLand::transform
 	return world;
 }
 
-bool FrontApproachPIDPrecisionLand::targetExpired(const rclcpp::Time& now) const
+bool FrontApproach::targetExpired(const rclcpp::Time& now) const
 {
 	if (!_front_tag.valid()) {
 		return true;
@@ -252,7 +252,7 @@ bool FrontApproachPIDPrecisionLand::targetExpired(const rclcpp::Time& now) const
 	return (now - _front_tag.timestamp).seconds() > _param_target_timeout;
 }
 
-bool FrontApproachPIDPrecisionLand::positionReached(const Eigen::Vector3f& target) const
+bool FrontApproach::positionReached(const Eigen::Vector3f& target) const
 {
 	auto position = _vehicle_local_position->positionNed();
 	auto velocity = _vehicle_local_position->velocityNed();
@@ -264,14 +264,14 @@ bool FrontApproachPIDPrecisionLand::positionReached(const Eigen::Vector3f& targe
 		&& (velocity.norm() < _param_delta_velocity);
 }
 
-void FrontApproachPIDPrecisionLand::resetController()
+void FrontApproach::resetController()
 {
 	_integral_xy.setZero();
 	_prev_error_xy.setZero();
 	_has_prev_error = false;
 }
 
-void FrontApproachPIDPrecisionLand::switchToState(State state)
+void FrontApproach::switchToState(State state)
 {
 	if (_state == state) {
 		return;
@@ -285,7 +285,7 @@ void FrontApproachPIDPrecisionLand::switchToState(State state)
 	}
 }
 
-std::string FrontApproachPIDPrecisionLand::stateName(State state) const
+std::string FrontApproach::stateName(State state) const
 {
 	switch (state) {
 	case State::Idle:
@@ -306,8 +306,8 @@ std::string FrontApproachPIDPrecisionLand::stateName(State state) const
 int main(int argc, char* argv[])
 {
 	rclcpp::init(argc, argv);
-	rclcpp::spin(std::make_shared<px4_ros2::NodeWithMode<precision_land::FrontApproachPIDPrecisionLand>>(
-		precision_land::kFrontApproachPidModeName, precision_land::kFrontApproachPidDebugOutput));
+	rclcpp::spin(std::make_shared<px4_ros2::NodeWithMode<precision_land::FrontApproach>>(
+		precision_land::kFrontApproachModeName, precision_land::kFrontApproachDebugOutput));
 	rclcpp::shutdown();
 	return 0;
 }
