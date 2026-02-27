@@ -155,50 +155,174 @@ email me at jsafeer1@terpmail.umd.edu
 
 [CMakeBasics](https://nu-msr.github.io/navigation_site/lectures/cmake_basics.html)
 
-### Hardware
-#### Prerequisites
-* Ubuntu 22.04
-* ROS2 Humble
-* Drone with downward facing camera
-* Micro XRCE-DDS Agent
-* QGroundControl
-* OpenCV 4.10.0
-* Camera node:
-I use an usb camera, there is a ROS2 package already out there for it:
+## Real Flight Testing
+### Hardware Requirements
+* Nvidia Jetson Orin Nano Super Developer Kit
+* Pixhawk Orange Cube Plus
+* USB to TTL converter
+* Optical Flow Sensor or other pose estimation source
+
+### Step 1: Set up drone for manual flight
+Assemble the drone with everything necessary to fly properly in both Stabilized and Position flight modes before evaluating any autonomous missions. This step is crucial for verifying that the airframe, propulsion, and flight controller operate reliably independent of the Jacob’s Ladder autonomy stack.
+
+Required actions:
+
+* Flash the Cube flight controller with a supported PX4 firmware version
+
+* Perform full sensor calibration (accelerometer, gyroscope, magnetometer, level horizon)
+
+* Calibrate ESCs and verify proper motor direction and response
+
+* Configure RC transmitter and verify manual control authority
+
+* Set up telemetry communication with QGroundControl
+
+* Verify stable hover performance in:
+    - Stabilized mode
+    - Position mode (requires GPS or optical flow / external pose estimation)
+
+The vehicle must demonstrate stable and repeatable manual flight before proceeding.
+
+### Step 2: Set up Jetson onboard computer
+Flash the Jetson with JetPack and install Ubuntu 22.04.
+
+Due to compute architecture differences between x86 (PC) and ARM64 (Jetson), software packages and containers built for simulation may not work directly on the Jetson. A separate Docker image is available on DockerHub for ARM64 compatibility, but initial setup and debugging are easier without Docker.
+
+Install and build the ROS 2 workspace directly on the Jetson.
+
+#### Step 2.1: Verify offboard nodes using networked simulation
+Before connecting to real hardware, verify the autonomy stack using a networked PX4 SITL simulation.
+
+On the PC in two separate terminals:
+```
+cd ~/src/PX4-Autopilot && make px4_sitl gz_x500_mono_cam_down_aruco; exec bash
+```
+```
+cd ~/path/to/Jacob_Ladder && source install/setup.bash && MicroXRCEAgent udp4 -p 8888
+```
+
+On the Jetson:
+```
+cd ~/path/to/Jacob_Ladder && source install/setup.bash && ros2 run translation_node translation_node_bin
+```
+```
+cd ~/path/to/Jacob_Ladder && source install/setup.bash && ros2 launch aruco_tracker v1_16_tracker.launch.py
+```
+```
+cd ~/path/to/Jacob_Ladder && source install/setup.bash && ros2 launch precision_land precision_land.launch.py
+```
+Verify:
+
+* ROS nodes run without errors
+* DDS communication is functioning
+* Commands are received by PX4
+* Vehicle responds correctly in simulation
+
+This step confirms the software stack is functioning properly on Jetson before hardware integration.
+
+#### Step 2.2: Camera Node Setup
+
+I use a usb camera, there is a ROS2 package already out there for it:
 https://github.com/ros-drivers/usb_cam.git
 
-You can either run the the nodes or turn them into a service, that starts at boot:
-#### Normal run
-
-##### Service
-
-First, you need to move your service file to the /etc/systemd/system/ directory, where systemd can find it. Replace myservice.service with the actual name of your service file.
-
-Ensure that the service file has the correct permissions. Typically, it should be readable by all users:
-```
-sudo chmod 644 /etc/systemd/system/myservice.service
+Run the ArUco tracker with topic remapping:
 
 ```
-After copying the service file, reload the systemd daemon to recognize the new service:
+ros2 run aruco_tracker aruco_tracker \
+  --ros-args \
+  -r /camera:=/oak/rgb/image_raw \
+  -r /camera_info:=/oak/rgb/camera_info
+```
 
+Verify correct operation using:
 ```
-sudo systemctl daemon-reload
+ros2 run rqt_image_view rqt_image_view
+```
+Confirm that:
 
-```
-Start the service using systemctl:
+* Camera images are streaming
+* ArUco markers are detected correctly
+* Detection behavior matches simulation
 
-```
-sudo systemctl start myservice
+#### Step 2.3: Add startup script for Jetson hotspot connection
+Step 2.3: Add startup script for Jetson hotspot connection
 
-```
-If you want the service to start automatically on boot, enable it:
+In order to connect to the Jetson during flight, you must be able to SSH into it. Many institutional or enterprise networks prevent peer-to-peer SSH connections or block device discovery. To ensure reliable access in all environments, configure the Jetson to automatically create its own Wi-Fi hotspot at boot.
 
-```
-sudo systemctl enable myservice
+This allows a laptop to connect directly to the Jetson without relying on external network infrastructure.
 
-```
-Verify that the service is running correctly:
-```
-sudo systemctl status myservice
 
+### Step 3: Connecting the Jetson to the Cube
+
+##### The physical connection
+Use a USB-to-TTL converter to connect: 
+Jetson USB port → Cube Orange+ TELEM2 port
+Typical wiring:
+* Jetson TX → Cube RX
+* Jetson RX → Cube TX
+* Jetson GND → Cube GND
+Do NOT connect 5V power between devices.
+After connecting, verify the serial device appears on the Jetson:
 ```
+ls /dev/ttyUSB*
+```
+#### Step 3.1: PX4 Parameter Configuration
+The parameters file located within this repository matches the original experiments of this research exactly. You may not want to copy all the parameters exactly depending on how you plan to implement pose estimation and other features within your system. In fact, the only parameters that you really need to be concerned with to set up the Jacob's Ladder system are the MAVLink communications and UXRCE_DDS configuration. 
+
+Required MAVLink parameters:
+```
+MAV_1_CONFIG = TELEM1
+MAV_1_RATE   = 57600
+```
+Required uXRCE-DDS parameters:
+```
+UXRCE_DDS_CFG = TELEM2
+UXRCE_DDS_BAUD = 921600
+```
+Make sure there are no MAVLink instances running on TELEM2
+After setting parameters:
+* Reboot the flight controller
+* Verify no parameter errors in QGroundControl
+
+#### Step 3.2: Start the Micro XRCE-DDS Agent
+On the Jetson, start the DDS agent:
+```
+MicroXRCEAgent serial --dev /dev/ttyUSB0 -b 921600
+```
+You should see output indicating successful connection that mirrors the output you see in the XRCE-DDS window during simulation
+
+### Step 4: Verify ROS-PX4 Communication
+Source the workspace:
+```
+source ~/jacobs_ladder_ws/install/setup.bash
+```
+Verify PX4 topics are visible:
+```
+ros2 topic list
+```
+Expected topics include:
+```
+/fmu/out/vehicle_odometry
+/fmu/out/vehicle_status
+/fmu/in/offboard_control_mode
+/fmu/in/trajectory_setpoint
+```
+Confirm data is publishing:
+```
+ros2 topic echo /fmu/out/vehicle_odometry
+```
+### Step 5: Offboard mode testing (propellers removed)
+
+Before flight testing, verify offboard control safely without propellers.
+
+Run:
+```
+ros2 run offboard_ladder velocity_test_node
+```
+Verify:
+
+* No communication errors
+* PX4 enters Offboard mode
+* Setpoints are received correctly
+
+Use QGroundControl to monitor vehicle state.
