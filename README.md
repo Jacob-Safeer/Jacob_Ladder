@@ -15,7 +15,7 @@ mkdir src
 cd src
 git clone https://github.com/PX4/PX4-Autopilot.git
 ```
-The latest PX4-Autopilot is recommended, but this repository contains a message translation node that allows for compatibility with any version of PX4. However, some versions of PX4 do not contain the gazebo worlds and models necessary for simulation. If this is the case for your PX4 version, refer to PX4's official worlds and models documentation within the user guide.The gazebo folder of this repository contains the custom world that I created for simulation of maritime application autonomous precision landing.
+The v1.16.0 tag of PX4-Autopilot is recommended, but this repository contains a message translation node that allows for compatibility with most versions of PX4 from 1.16 and forward. However, some versions of PX4 do not contain the gazebo worlds and models necessary for simulation. If this is the case for your PX4 version, refer to PX4's official worlds and models documentation within the user guide.The gazebo folder of this repository contains the custom world that I created for simulation of maritime application autonomous precision landing.
 
 ### QGC
 Install using the link below:
@@ -223,7 +223,7 @@ This step confirms the software stack is functioning properly on Jetson before h
 #### Step 2.2: Camera Node Setup
 
 I use a usb camera, there is a ROS2 package already out there for it:
-https://github.com/ros-drivers/usb_cam.git
+https://docs.luxonis.com/software-v3/depthai/ros/driver/
 
 Run the ArUco tracker with topic remapping:
 
@@ -289,7 +289,7 @@ On the Jetson, start the DDS agent:
 ```
 MicroXRCEAgent serial --dev /dev/ttyUSB0 -b 921600
 ```
-You should see output indicating successful connection that mirrors the output you see in the XRCE-DDS window during simulation
+You should see output indicating successful connection that mirrors the output you see in the XRCE-DDS window during simulation.
 
 ### Step 4: Verify ROS-PX4 Communication
 Source the workspace:
